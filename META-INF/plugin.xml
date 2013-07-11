@@ -1,8 +1,8 @@
 <idea-plugin version="2">
-  <id>com.yourcompany.unique.plugin.id</id>
-  <name>Plugin display name here</name>
-  <version>1.0</version>
-  <vendor email="support@yourcompany.com" url="http://www.yourcompany.com">YourCompany</vendor>
+  <id>org.idea.plugin.pofgen</id>
+  <name>PofSerializer generator</name>
+  <version>0.1</version>
+  <vendor email="yurii.samsoniuk@gmail.com" url="http://www.yourcompany.com">Yurii Samsoniuk</vendor>
 
   <description><![CDATA[
       Enter short description for your plugin here.<br>
@@ -35,7 +35,7 @@
   <actions>
     <!-- Add your actions here -->
       <action id="GeneratePofAction" class="org.idea.plugin.pofgen.GeneratePofAction" text="Generate PofSerializer"
-          description="Generates PofSerializer for class">
+          description="Generate PofSerializer for a class">
           <add-to-group group-id="GenerateGroup" anchor="last"/>
       </action>
   </actions>
