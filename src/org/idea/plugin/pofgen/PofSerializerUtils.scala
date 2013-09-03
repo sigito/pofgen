@@ -1,7 +1,6 @@
 package org.idea.plugin.pofgen
 
 import com.intellij.psi.{PsiPrimitiveType, PsiType}
-import com.intellij.patterns.PsiTypeCastExpressionPattern
 
 /**
  * @author sigito
@@ -40,7 +39,7 @@ class PofSerializerUtils {
   private def addReadMethod(collector: StringBuilder, methodName: String, instance: String, field: SerializableField, reader: String): Unit = {
     collector ++= instance ++= "." ++= field.setter.getName ++= "("
     // cast
-    collector ++= "(" ++= field.typeName ++= ")"
+    collector ++= "(" ++= field.typeName ++= ") "
     // read field
     collector ++= reader ++= "." ++= methodName ++= "("
     collector ++= field.indexName ++= ")"

@@ -5,11 +5,8 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.command.WriteCommandAction.Simple
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi._
-import com.intellij.psi.util.{PsiFormatUtilBase, PsiFormatUtil, PsiTreeUtil}
-import scala.Seq
 import com.intellij.psi.codeStyle.{CodeStyleManager, JavaCodeStyleManager}
-import com.intellij.psi.util.PsiFormatUtil.FormatClassOptions
-import com.intellij.openapi.editor.Editor
+import com.intellij.psi.util.PsiTreeUtil
 
 /**
  * @author sigito
