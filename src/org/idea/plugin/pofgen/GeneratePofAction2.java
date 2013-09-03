@@ -4,7 +4,6 @@ import com.intellij.openapi.actionSystem.AnAction;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.actionSystem.LangDataKeys;
 import com.intellij.openapi.actionSystem.PlatformDataKeys;
-import com.intellij.openapi.command.WriteCommandAction;
 import com.intellij.openapi.editor.Editor;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.module.ModuleUtil;
@@ -20,7 +19,7 @@ import java.util.List;
 /**
  * @author sigito
  */
-public class GeneratePofAction extends AnAction {
+public abstract class GeneratePofAction2 extends AnAction {
     public static final String POF_SERIALIZER = "com.tangosol.io.pof.PofSerializer";
     public static final String POF_SERIALIZER_SUFFIX = "PofSerializer";
 
@@ -30,27 +29,27 @@ public class GeneratePofAction extends AnAction {
     public static final String DESERIALIZE_METHOD = "deserialize";
     public static final String POF_READER = "com.tangosol.io.pof.PofReader";
 
-    public void actionPerformed(AnActionEvent e) {
-        PsiClass psiClass = getPsiClassFromContext(e);
-        GenerateDialog generateDialog = new GenerateDialog(psiClass);
-        generateDialog.show();
-        if (generateDialog.isOK()) {
-            generateSerializer(psiClass, generateDialog.getSerializeFields());
-        }
-    }
-
-    private void generateSerializer(final PsiClass psiClass, final List<PsiField> fields) {
-        new WriteCommandAction.Simple(psiClass.getProject(), psiClass.getContainingFile()) {
-
-            @Override
-            protected void run() throws Throwable {
-                generateSerializerContent(psiClass, fields);
-            }
-        }.execute();
-    }
+//    public void actionPerformed(AnActionEvent e) {
+//        PsiClass psiClass = getPsiClassFromContext(e);
+//        GenerateDialog generateDialog = new GenerateDialog(psiClass);
+//        generateDialog.show();
+//        if (generateDialog.isOK()) {
+//            generateSerializer(psiClass, generateDialog.getSerializeFields());
+//        }
+//    }
+//
+//    private void generateSerializer(final PsiClass psiClass, final List<PsiField> fields) {
+//        new WriteCommandAction.Simple(psiClass.getProject(), psiClass.getContainingFile()) {
+//
+//            @Override
+//            protected void run() throws Throwable {
+//                generateSerializerContent(psiClass, fields);
+//            }
+//        }.execute();
+//    }
 
     private void generateSerializerContent(PsiClass psiClass, List<PsiField> fields) {
-        List<SerializableField> serializableFields = processFields(psiClass, fields);
+        List<SerializableField> serializableFields = processFields(fields);
 
 //        PsiPackage psiPackage = PsiTreeUtil.getParentOfType(psiClass, PsiPackage.class);
         // create pof serializer class
@@ -73,20 +72,15 @@ public class GeneratePofAction extends AnAction {
     }
 
     private void addSerializeMethod(PsiElementFactory elementFactory, PsiClass serializingClass, PsiClass serializerClass, List<SerializableField> serializableFields) {
-        PsiClass pofWriterClass = findClass(POF_WRITER, serializingClass);
-
-        StringBuilder code = new StringBuilder();
-        code.append("public void serialize(com.tangosol.io.pof.PofWriter pofWriter, java.lang.Object o) throws java.io.IOException {");
+        StringBuilder code = new StringBuilder("public void serialize(com.tangosol.io.pof.PofWriter pofWriter, java.lang.Object o) throws java.io.IOException {");
         String sourceClassName = serializingClass.getQualifiedName();
-        String sourceName = StringUtil.decapitalize(serializerClass.getName());
+        String sourceName = StringUtil.decapitalize(serializingClass.getName());
         code.append(sourceClassName).append(' ').append(sourceName);
         code.append(" = (").append(sourceClassName).append(") ").append("o;");
 
         // write every field
         for (SerializableField field : serializableFields) {
-            code.append("pofWriter").append('.').append(selectMethod(null, field)).append('(');
-            code.append(field.getIndexName()).append(", ");
-            code.append(sourceName).append('.').append(field.getGetter().getName()).append("()").append(");");
+//            PofSerializerUtils.addWriteMethod(code, sourceName, field);
         }
 
         // write remainder
@@ -97,19 +91,14 @@ public class GeneratePofAction extends AnAction {
         serializerClass.add(serializeMethod);
     }
 
-    private String selectMethod(PsiParameter pofWriter, SerializableField field) {
-        // todo
-        return "writeObject";
-    }
-
     private void addIndexConstants(PsiElementFactory elementFactory, PsiClass serializerClass, List<SerializableField> serializableFields) {
         for (SerializableField serializableField : serializableFields) {
             // create static field
-            PsiField indexConstant = elementFactory.createField(serializableField.getIndexName(), PsiType.INT);
+            PsiField indexConstant = elementFactory.createField(serializableField.indexName(), PsiType.INT);
             indexConstant.getModifierList().setModifierProperty(PsiModifier.PRIVATE, true);
             indexConstant.getModifierList().setModifierProperty(PsiModifier.STATIC, true);
             indexConstant.getModifierList().setModifierProperty(PsiModifier.FINAL, true);
-            indexConstant.setInitializer(elementFactory.createExpressionFromText(String.valueOf(serializableField.getIndex()), serializerClass));
+            indexConstant.setInitializer(elementFactory.createExpressionFromText(String.valueOf(serializableField.index()), serializerClass));
 
             serializerClass.add(indexConstant);
         }
@@ -123,7 +112,7 @@ public class GeneratePofAction extends AnAction {
         return serializerClass;
     }
 
-    private List<SerializableField> processFields(PsiClass psiClass, List<PsiField> fields) {
+    private List<SerializableField> processFields(List<PsiField> fields) {
         List<SerializableField> serializableFields = new ArrayList<SerializableField>();
 
         int index = 0;
