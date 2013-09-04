@@ -1,4 +1,4 @@
-package org.idea.plugin.pofgen
+package org.idea.plugin.pofgen.generation
 
 import com.intellij.psi.codeStyle.{VariableKind, JavaCodeStyleManager}
 import com.intellij.psi.util.PropertyUtil
