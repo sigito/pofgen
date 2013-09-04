@@ -6,7 +6,7 @@ import com.intellij.openapi.command.WriteCommandAction.Simple
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi._
 import com.intellij.psi.codeStyle.{CodeStyleManager, JavaCodeStyleManager}
-import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.util.{ClassUtil, PsiTreeUtil}
 
 /**
  * @author sigito
@@ -109,8 +109,8 @@ class GeneratePofAction() extends AnAction() {
     }
 
   private def writeMethod(serializer: PsiClass, clazz: PsiClass, fields: Seq[SerializableField])(implicit elementFactory: PsiElementFactory): PsiMethod = {
+    val writerClass = ClassUtil.findPsiClassByJVMName(PsiManager.getInstance(clazz.getProject), "com.tangosol.io.pof.PofWriter")
     val code = new StringBuilder("public void serialize(com.tangosol.io.pof.PofWriter pofWriter, java.lang.Object o) throws java.io.IOException {")
-
     // declare serialize object instance and cast
     val instanceClassName: String = clazz.getQualifiedName
     val instanceName = StringUtil.decapitalize(clazz.getName)
@@ -119,13 +119,14 @@ class GeneratePofAction() extends AnAction() {
     code.append(" = (") ++= instanceClassName ++= ") " ++= "o;"
 
     // write every field
-    fields.foreach(PofSerializerUtils.addWriteMethod(code, instanceName, _, "pofWriter"))
+    fields.foreach(PofSerializerUtils.addWriteMethod2(code, writerClass, "pofWriter", instanceName, _))
 
     // write remainder
     code.append("pofWriter").append(".writeRemainder(null);")
 
     code.append("}")
     elementFactory.createMethodFromText(code.toString(), serializer)
+
   }
 
   private def readMethod(serializer: PsiClass, clazz: PsiClass, fields: Seq[SerializableField])(implicit elementFactory: PsiElementFactory): PsiMethod = {
