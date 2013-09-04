@@ -22,11 +22,11 @@ class SerializerGenerator(val clazz: PsiClass, val fields: Seq[SerializableField
     // load serializer class
     val serializer: PsiClass = createSerializer(clazz)
     // add read/write indexes for fields
-    addIndexes(serializer, fields)
+    addIndexes(serializer)
     // add write method
-    serializer.add(writeMethod(serializer, clazz, fields))
+    serializer.add(writeMethod())
     // add read method
-    serializer.add(readMethod(serializer, clazz, fields))
+    serializer.add(readMethod())
 
     val serializerFile = createFile(serializer)
 
@@ -53,7 +53,7 @@ class SerializerGenerator(val clazz: PsiClass, val fields: Seq[SerializableField
     serializerClass
   }
 
-  private def addIndexes(serializerClass: PsiClass, fields: Seq[SerializableField]): Unit =
+  private def addIndexes(serializer: PsiClass): Unit =
     fields.foreach {
       field =>
       // create static field
@@ -61,12 +61,12 @@ class SerializerGenerator(val clazz: PsiClass, val fields: Seq[SerializableField
         indexConstant.getModifierList.setModifierProperty(PsiModifier.PRIVATE, true)
         indexConstant.getModifierList.setModifierProperty(PsiModifier.STATIC, true)
         indexConstant.getModifierList.setModifierProperty(PsiModifier.FINAL, true)
-        indexConstant.setInitializer(elementFactory.createExpressionFromText(field.index.toString, serializerClass))
+        indexConstant.setInitializer(elementFactory.createExpressionFromText(field.index.toString, serializer))
         // add constant field to serializer class
-        serializerClass.add(indexConstant)
+        serializer.add(indexConstant)
     }
 
-  private def writeMethod(serializer: PsiClass, clazz: PsiClass, fields: Seq[SerializableField]): PsiMethod = {
+  private def writeMethod(): PsiMethod = {
     val writerClass = ClassUtil.findPsiClassByJVMName(clazz.getManager, "com.tangosol.io.pof.PofWriter")
     val code = new StringBuilder("public void serialize(com.tangosol.io.pof.PofWriter pofWriter, java.lang.Object o) throws java.io.IOException {")
     // declare serialize object instance and cast
@@ -83,11 +83,11 @@ class SerializerGenerator(val clazz: PsiClass, val fields: Seq[SerializableField
     code.append("pofWriter").append(".writeRemainder(null);")
 
     code.append("}")
-    elementFactory.createMethodFromText(code.toString(), serializer)
+    elementFactory.createMethodFromText(code.toString(), clazz)
 
   }
 
-  private def readMethod(serializer: PsiClass, clazz: PsiClass, fields: Seq[SerializableField]): PsiMethod = {
+  private def readMethod(): PsiMethod = {
     val readerClass = ClassUtil.findPsiClassByJVMName(clazz.getManager, "com.tangosol.io.pof.PofReader")
 
     val instanceName = StringUtil.decapitalize(clazz.getName)
@@ -107,6 +107,6 @@ class SerializerGenerator(val clazz: PsiClass, val fields: Seq[SerializableField
 
     code.append("return ") ++= instanceName ++= ";"
     code.append("}")
-    elementFactory.createMethodFromText(code.toString(), serializer)
+    elementFactory.createMethodFromText(code.toString(), clazz)
   }
 }
