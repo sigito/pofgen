@@ -9,7 +9,7 @@ import com.intellij.psi.util.ClassUtil
 /**
  * @author sigito
  */
-class SerializerGenerator(val clazz: PsiClass, val fields: Array[SerializableField]) {
+class SerializerGenerator(val clazz: PsiClass, val fields: Seq[SerializableField]) {
   val SERIALIZER_CLASS_NAME: String = "com.tangosol.io.pof.PofSerializer"
   val SERIALIZER_NAME_SUFFIX: String = "PofSerializer"
 
@@ -42,7 +42,7 @@ class SerializerGenerator(val clazz: PsiClass, val fields: Array[SerializableFie
     parent.add(containingFile).asInstanceOf[PsiFile]
   }
 
-  private def createSerializer(clazz: PsiClass)(implicit elementFactory: PsiElementFactory): PsiClass = {
+  private def createSerializer(clazz: PsiClass): PsiClass = {
     // load create new class for serializer
     val serializerClass = elementFactory.createClass(clazz.getName + SERIALIZER_NAME_SUFFIX)
 
@@ -53,7 +53,7 @@ class SerializerGenerator(val clazz: PsiClass, val fields: Array[SerializableFie
     serializerClass
   }
 
-  private def addIndexes(serializerClass: PsiClass, fields: Seq[SerializableField])(implicit elementFactory: PsiElementFactory): Unit =
+  private def addIndexes(serializerClass: PsiClass, fields: Seq[SerializableField]): Unit =
     fields.foreach {
       field =>
       // create static field

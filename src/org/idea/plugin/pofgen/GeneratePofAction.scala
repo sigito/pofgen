@@ -7,7 +7,7 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi._
 import com.intellij.psi.codeStyle.{CodeStyleManager, JavaCodeStyleManager}
 import com.intellij.psi.util.{ClassUtil, PsiTreeUtil}
-import org.idea.plugin.pofgen.generation.{SerializableField, PofSerializerUtils}
+import org.idea.plugin.pofgen.generation.{SerializerGenerator, SerializableField, PofSerializerUtils}
 
 /**
  * @author sigito
@@ -43,9 +43,9 @@ class GeneratePofAction() extends AnAction() {
 
   private def executeGenerationAction(clazz: PsiClass, fields: Seq[PsiField]): Unit = {
     val action: WriteCommandAction[_] = new Simple(clazz.getProject, clazz.getContainingFile) {
-      override def run(): Unit = generateSerializer(clazz, fields.zipWithIndex.map {
+      override def run(): Unit = new SerializerGenerator(clazz, fields.zipWithIndex.map {
         case (field, index) => new SerializableField(field, index)
-      })
+      }).generate()
     }
 
     action.execute()
