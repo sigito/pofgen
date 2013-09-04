@@ -8,41 +8,32 @@ import com.intellij.psi._
 class PofSerializerUtils {
   val READ_PREFIX: String = "read"
 
-  def addWriteMethod(collector: StringBuilder, writerClass: PsiClass, writer: String, instanceName: String, field: SerializableField): Unit = {
+  def addWriteMethod(collector: StringBuilder, writerClass: PsiClass, writer: String, instance: String, field: SerializableField): Unit = {
     val writeMethod = selectWriteMethod(writerClass, field.psiField.getType)
 
     collector ++= writer ++= "." ++= writeMethod.getName ++= "("
     collector ++= field.indexName ++= ", "
-    collector ++= instanceName ++= "." ++= field.getter.getName ++= "());"
+    collector ++= instance ++= "." ++= field.getter.getName ++= "()"
+    collector ++= ");"
   }
 
-  def addReadMethod(collector: StringBuilder, instance: String, field: SerializableField, reader: String = "pofReader"): Unit = {
-    val fieldType = field.psiField.getType
-    val methodName = READ_PREFIX + methodSuffix(fieldType)
-    addReadMethod(collector, methodName, instance, field, reader)
-  }
+  def addReadMethod(collector: StringBuilder, readerClass: PsiClass, reader: String, instance: String, field: SerializableField): Unit = {
+    val readMethod = selectReadMethod(readerClass, field.psiField.getType)
 
-  private def methodSuffix(psiType: PsiType): String = {
-    psiType match {
-      case primitiveType: PsiPrimitiveType => primitiveType.getCanonicalText.capitalize
-      case _ => {
-        "Object"
-      }
-    }
-  }
-
-  private def addReadMethod(collector: StringBuilder, methodName: String, instance: String, field: SerializableField, reader: String): Unit = {
     collector ++= instance ++= "." ++= field.setter.getName ++= "("
-    // cast
-    collector ++= "(" ++= field.typeName ++= ") "
-    // read field
-    collector ++= reader ++= "." ++= methodName ++= "("
+
+    if (!field.psiField.getType.isAssignableFrom(readMethod.getReturnType))
+    // add cast
+      collector ++= "(" ++= field.typeName ++= ") "
+
+    // read and set field
+    collector ++= reader ++= "." ++= readMethod.getName ++= "("
     collector ++= field.indexName ++= ")"
     collector ++= ");"
   }
 
-  private def selectWriteMethod(writerClass: PsiClass, fieldType: PsiType): PsiMethod = {
-    // default one
+  def selectWriteMethod(writerClass: PsiClass, fieldType: PsiType): PsiMethod = {
+    // default write method
     val writeObjectMethod = writerClass.findMethodsByName("writeObject", true).head
 
     def findMethod(field: PsiType): Option[PsiMethod] = {
@@ -54,7 +45,7 @@ class PofSerializerUtils {
             // get second, first one is for index
             val valueParameter: PsiParameter = parameters.tail.head
             val valueParameterType = valueParameter.getType
-            valueParameterType == fieldType
+            valueParameterType == field
           }
       }
     }
@@ -69,6 +60,23 @@ class PofSerializerUtils {
         }
     }
   }
+
+  def selectReadMethod(readerClass: PsiClass, fieldType: PsiType): PsiMethod = {
+    val readObjectMethod = readerClass.findMethodsByName("readObject", true).head
+
+    def findMethod(field: PsiType): Option[PsiMethod] =
+      readerClass.getMethods filter (_.getName.startsWith("read")) find (_.getReturnType == field)
+
+    findMethod(fieldType) match {
+      case Some(selectedMethod) => selectedMethod
+      case None =>
+        val superTypes = fieldType.getSuperTypes
+        (readObjectMethod /: superTypes) {
+          (selectedMethod, fieldType) =>
+            findMethod(fieldType).getOrElse(selectedMethod)
+        }
+    }
+  }
 }
 
-  object PofSerializerUtils extends PofSerializerUtils
+object PofSerializerUtils extends PofSerializerUtils

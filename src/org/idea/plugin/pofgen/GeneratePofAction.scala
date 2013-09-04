@@ -130,6 +130,8 @@ class GeneratePofAction() extends AnAction() {
   }
 
   private def readMethod(serializer: PsiClass, clazz: PsiClass, fields: Seq[SerializableField])(implicit elementFactory: PsiElementFactory): PsiMethod = {
+    val readerClass = ClassUtil.findPsiClassByJVMName(PsiManager.getInstance(clazz.getProject), "com.tangosol.io.pof.PofReader")
+
     val instanceName = StringUtil.decapitalize(clazz.getName)
     val instanceClassName: String = clazz.getQualifiedName
 
@@ -140,7 +142,7 @@ class GeneratePofAction() extends AnAction() {
     code.append(" = new ") ++= instanceClassName ++= "();"
 
     // read every field
-    fields.foreach(PofSerializerUtils.addReadMethod(code, instanceName, _, "pofReader"))
+    fields.foreach(PofSerializerUtils.addReadMethod(code, readerClass, "pofReader", instanceName, _))
 
     // read remainder
     code.append("pofReader").append(".readRemainder();")
