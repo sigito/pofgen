@@ -30,12 +30,12 @@ class GeneratePofAction() extends AnAction() {
   }
 
   override def actionPerformed(e: AnActionEvent): Unit = {
-    val psiClass = getPsiClassFromContext(e)
-    psiClass.foreach {
-      clazz =>
+    getPsiClassFromContext(e) match {
+      case Some(clazz) =>
         val generateDialog = new GenerateDialog(clazz)
         generateDialog.show()
         if (generateDialog.isOK) executeGenerationAction(clazz, generateDialog.selectedFields)
+      case None =>
     }
   }
 
@@ -53,7 +53,7 @@ class GeneratePofAction() extends AnAction() {
 
 
   private def executeGenerationAction(clazz: PsiClass, fields: Seq[PsiField]): Unit = {
-    val action: WriteCommandAction[_] = new Simple(clazz.getProject(), clazz.getContainingFile()) {
+    val action: WriteCommandAction[_] = new Simple(clazz.getProject, clazz.getContainingFile) {
       override def run(): Unit = generateSerializer(clazz, fields.zipWithIndex.map {
         case (field, index) => new SerializableField(field, index)
       })
@@ -62,7 +62,7 @@ class GeneratePofAction() extends AnAction() {
     action.execute()
   }
 
-  def generateSerializer(clazz: PsiClass, fields: Seq[SerializableField]): Unit = {
+  private def generateSerializer(clazz: PsiClass, fields: Seq[SerializableField]): Unit = {
     implicit val elementFactory = JavaPsiFacade.getElementFactory(clazz.getProject)
     // load serializer class
     val serializer: PsiClass = createSerializer(clazz)
@@ -73,17 +73,18 @@ class GeneratePofAction() extends AnAction() {
     // add read method
     serializer.add(readMethod(serializer, clazz, fields))
 
-    // create file and format
+    // create file
     val parent: PsiDirectory = clazz.getContainingFile.getParent
-    val containingFile: PsiFile = serializer.getContainingFile
-    containingFile.setName(serializer.getName + ".java")
+    val containingFile = serializer.getContainingFile.setName(s"${serializer.getName}.java")
     val serializerFile = parent.add(containingFile).asInstanceOf[PsiFile]
+
+    // process code formatting
     JavaCodeStyleManager.getInstance(clazz.getProject).shortenClassReferences(serializerFile)
     CodeStyleManager.getInstance(clazz.getProject).reformat(serializerFile)
     serializerFile.navigate(true)
   }
 
-  def createSerializer(clazz: PsiClass)(implicit elementFactory: PsiElementFactory): PsiClass = {
+  private def createSerializer(clazz: PsiClass)(implicit elementFactory: PsiElementFactory): PsiClass = {
     // load create new class for serializer
     val serializerClass = elementFactory.createClass(clazz.getName + POF_SERIALIZER_SUFFIX)
 
@@ -94,7 +95,7 @@ class GeneratePofAction() extends AnAction() {
     serializerClass
   }
 
-  def addIndexes(serializerClass: PsiClass, fields: Seq[SerializableField])(implicit elementFactory: PsiElementFactory): Unit =
+  private def addIndexes(serializerClass: PsiClass, fields: Seq[SerializableField])(implicit elementFactory: PsiElementFactory): Unit =
     fields.foreach {
       field =>
       // create static field
@@ -107,18 +108,18 @@ class GeneratePofAction() extends AnAction() {
         serializerClass.add(indexConstant)
     }
 
-  def writeMethod(serializer: PsiClass, clazz: PsiClass, fields: Seq[SerializableField])(implicit elementFactory: PsiElementFactory): PsiMethod = {
+  private def writeMethod(serializer: PsiClass, clazz: PsiClass, fields: Seq[SerializableField])(implicit elementFactory: PsiElementFactory): PsiMethod = {
     val code = new StringBuilder("public void serialize(com.tangosol.io.pof.PofWriter pofWriter, java.lang.Object o) throws java.io.IOException {")
 
     // declare serialize object instance and cast
     val instanceClassName: String = clazz.getQualifiedName
     val instanceName = StringUtil.decapitalize(clazz.getName)
-    code.append(instanceClassName).append(' ').append(instanceName)
+    code ++= instanceClassName ++= " " ++= instanceName
     // cast and assign input object to our class type
-    code.append(" = (").append(instanceClassName).append(") ").append("o;")
+    code.append(" = (") ++= instanceClassName ++= ") " ++= "o;"
 
     // write every field
-    fields.foreach(PofSerializerUtils.addWriteMethod(code, instanceName, _))
+    fields.foreach(PofSerializerUtils.addWriteMethod(code, instanceName, _, "pofWriter"))
 
     // write remainder
     code.append("pofWriter").append(".writeRemainder(null);")
@@ -127,15 +128,15 @@ class GeneratePofAction() extends AnAction() {
     elementFactory.createMethodFromText(code.toString(), serializer)
   }
 
-  def readMethod(serializer: PsiClass, clazz: PsiClass, fields: Seq[SerializableField])(implicit elementFactory: PsiElementFactory): PsiMethod = {
+  private def readMethod(serializer: PsiClass, clazz: PsiClass, fields: Seq[SerializableField])(implicit elementFactory: PsiElementFactory): PsiMethod = {
     val instanceName = StringUtil.decapitalize(clazz.getName)
     val instanceClassName: String = clazz.getQualifiedName
 
-    val code = new StringBuilder("public ").append(instanceClassName).append(" deserialize(com.tangosol.io.pof.PofReader pofReader) throws java.io.IOException {")
+    val code = new StringBuilder("public ") ++= instanceClassName ++= " deserialize(com.tangosol.io.pof.PofReader pofReader) throws java.io.IOException {"
 
     // declare deserialize object instance and initialize
-    code.append(instanceClassName).append(' ').append(instanceName)
-    code.append(" = new ").append(instanceClassName).append("();")
+    code ++= instanceClassName ++= " " ++= instanceName
+    code.append(" = new ") ++= instanceClassName ++= "();"
 
     // read every field
     fields.foreach(PofSerializerUtils.addReadMethod(code, instanceName, _, "pofReader"))
@@ -143,7 +144,7 @@ class GeneratePofAction() extends AnAction() {
     // read remainder
     code.append("pofReader").append(".readRemainder();")
 
-    code.append("return ").append(instanceName).append(";")
+    code.append("return ") ++= instanceName ++= ";"
     code.append("}")
     elementFactory.createMethodFromText(code.toString(), serializer)
   }

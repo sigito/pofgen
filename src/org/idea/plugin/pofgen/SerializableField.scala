@@ -13,6 +13,7 @@ class SerializableField(val psiField: PsiField, val index: Int) {
   val getter: PsiMethod = PropertyUtil.findGetterForField(psiField)
   val setter: PsiMethod = PropertyUtil.findSetterForField(psiField)
   val indexName: String = {
+    // ask IntelliJ for suggestions
     val codeStyleManager = JavaCodeStyleManager.getInstance(psiField.getProject)
     val suggestedNames = codeStyleManager.suggestVariableName(VariableKind.STATIC_FINAL_FIELD, name, null, null).names
 

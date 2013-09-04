@@ -1,6 +1,6 @@
 package org.idea.plugin.pofgen
 
-import com.intellij.psi.{PsiPrimitiveType, PsiType}
+import com.intellij.psi._
 
 /**
  * @author sigito
@@ -9,10 +9,10 @@ class PofSerializerUtils {
   val WRITE_PREFIX: String = "write"
   val READ_PREFIX: String = "read"
 
-  def addWriteMethod(collector: StringBuilder, instanceName: String, field: SerializableField): Unit = {
+  def addWriteMethod(collector: StringBuilder, instanceName: String, field: SerializableField, writer: String = "pofWriter"): Unit = {
     val fieldType = field.psiField.getType
     val methodName = WRITE_PREFIX + methodSuffix(fieldType)
-    addWriteMethod(collector, methodName, instanceName, field)
+    addWriteMethod(collector, methodName, instanceName, field, writer)
   }
 
   def addReadMethod(collector: StringBuilder, instance: String, field: SerializableField, reader: String = "pofReader"): Unit = {
@@ -29,8 +29,8 @@ class PofSerializerUtils {
     }
   }
 
-  private def addWriteMethod(collector: StringBuilder, methodName: String, instance: String, field: SerializableField): Unit = {
-    collector ++= "pofWriter." ++= methodName ++= "("
+  private def addWriteMethod(collector: StringBuilder, methodName: String, instance: String, field: SerializableField, writer: String): Unit = {
+    collector ++= writer ++= "." ++= methodName ++= "("
     collector ++= field.indexName ++= ", "
     collector ++= instance ++= "." ++= field.getter.getName ++= "()"
     collector ++= ");"
