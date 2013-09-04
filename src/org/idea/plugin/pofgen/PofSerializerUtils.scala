@@ -1,9 +1,6 @@
 package org.idea.plugin.pofgen
 
 import com.intellij.psi._
-import com.intellij.psi.util.{PsiTreeUtil, PsiClassUtil, PsiTypesUtil}
-import com.intellij.openapi.module.{ModuleUtilCore, ModuleUtil, Module}
-import com.intellij.psi.search.GlobalSearchScope
 
 /**
  * @author sigito

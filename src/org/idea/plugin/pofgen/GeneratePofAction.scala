@@ -119,7 +119,7 @@ class GeneratePofAction() extends AnAction() {
     code.append(" = (") ++= instanceClassName ++= ") " ++= "o;"
 
     // write every field
-    fields.foreach(PofSerializerUtils.addWriteMethod2(code, writerClass, "pofWriter", instanceName, _))
+    fields.foreach(PofSerializerUtils.addWriteMethod(code, writerClass, "pofWriter", instanceName, _))
 
     // write remainder
     code.append("pofWriter").append(".writeRemainder(null);")
