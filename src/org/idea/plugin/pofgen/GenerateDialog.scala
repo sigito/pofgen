@@ -2,7 +2,7 @@ package org.idea.plugin.pofgen
 
 import com.intellij.ide.util.DefaultPsiElementCellRenderer
 import com.intellij.openapi.ui.{LabeledComponent, DialogWrapper}
-import com.intellij.psi.{PsiField, PsiClass}
+import com.intellij.psi.{PsiModifier, PsiField, PsiClass}
 import com.intellij.ui.components.JBList
 import com.intellij.ui.{CollectionListModel, ToolbarDecorator}
 import javax.swing.{ListCellRenderer, JList, JComponent, JPanel}
@@ -15,7 +15,11 @@ import scala.collection.convert.WrapAsScala._
 class GenerateDialog protected[pofgen](psiClass: PsiClass) extends DialogWrapper(psiClass.getProject) {
   setTitle("Select Fields to Use For Serialization")
 
-  private val fieldsListModel: CollectionListModel[PsiField] = new CollectionListModel[PsiField](psiClass.getAllFields: _*)
+  private val fieldsListModel: CollectionListModel[PsiField] = {
+    // filter static fields
+    val entityFields = psiClass.getAllFields filterNot (_.getModifierList.hasModifierProperty(PsiModifier.STATIC))
+    new CollectionListModel[PsiField](entityFields: _*)
+  }
 
   private val component: JComponent = {
     val fieldsList: JList[_] = new JBList(fieldsListModel).asInstanceOf[JList[_]]
