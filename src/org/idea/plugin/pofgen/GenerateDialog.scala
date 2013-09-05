@@ -16,8 +16,15 @@ class GenerateDialog protected[pofgen](psiClass: PsiClass) extends DialogWrapper
   setTitle("Select Fields to Use For Serialization")
 
   private val fieldsListModel: CollectionListModel[PsiField] = {
-    // filter static fields
-    val entityFields = psiClass.getAllFields filterNot (_.getModifierList.hasModifierProperty(PsiModifier.STATIC))
+    // filter static and transient fields
+    val entityFields = psiClass.getAllFields filterNot {
+      field =>
+        val modifiers = field.getModifierList
+        // exclude static fields
+        modifiers.hasModifierProperty(PsiModifier.STATIC) ||
+        // exclude transient fields
+        modifiers.hasModifierProperty(PsiModifier.TRANSIENT)
+    }
     new CollectionListModel[PsiField](entityFields: _*)
   }
 
