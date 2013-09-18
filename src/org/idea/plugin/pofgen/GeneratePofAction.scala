@@ -3,11 +3,9 @@ package org.idea.plugin.pofgen
 import com.intellij.openapi.actionSystem.{LangDataKeys, PlatformDataKeys, AnActionEvent, AnAction}
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.command.WriteCommandAction.Simple
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi._
-import com.intellij.psi.codeStyle.{CodeStyleManager, JavaCodeStyleManager}
-import com.intellij.psi.util.{ClassUtil, PsiTreeUtil}
-import org.idea.plugin.pofgen.generation.{SerializerGenerator, SerializableField, PofSerializerUtils}
+import com.intellij.psi.util.PsiTreeUtil
+import org.idea.plugin.pofgen.generation.{GenerationContext, Formatter, SerializerGenerator, EntityField}
 
 /**
  * @author sigito
@@ -41,13 +39,27 @@ class GeneratePofAction() extends AnAction() {
     } yield PsiTreeUtil.getParentOfType(elementAt, classOf[PsiClass])
   }
 
-  private def executeGenerationAction(clazz: PsiClass, fields: Seq[PsiField]): Unit = {
-    val action: WriteCommandAction[_] = new Simple(clazz.getProject, clazz.getContainingFile) {
-      override def run(): Unit = new SerializerGenerator(clazz, fields.zipWithIndex.map {
-        case (field, index) => new SerializableField(field, index)
-      }).generate()
+  private def executeGenerationAction(entityClazz: PsiClass, fields: IndexedSeq[PsiField]): Unit = {
+    val action: WriteCommandAction[_] = new Simple(entityClazz.getProject, entityClazz.getContainingFile) {
+      override def run(): Unit = {
+        val context = GenerationContext(entityClazz)
+
+        val serializerClazz: PsiClass = new SerializerGenerator(entityClazz, fields, context).generate()
+        Formatter.format(serializerClazz, context)
+
+        // create file
+        val parent: PsiDirectory = entityClazz.getContainingFile.getParent
+        val serializerFile = createClassFile(parent, serializerClazz)
+
+        serializerFile.navigate(true)
+      }
     }
 
     action.execute()
+  }
+
+  private def createClassFile(dir: PsiDirectory, clazz: PsiClass): PsiFile = {
+    val containingFile = clazz.getContainingFile.setName(s"${clazz.getName}.java")
+    dir.add(containingFile).asInstanceOf[PsiFile]
   }
 }

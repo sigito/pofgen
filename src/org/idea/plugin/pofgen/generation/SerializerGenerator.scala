@@ -1,112 +1,69 @@
 package org.idea.plugin.pofgen.generation
 
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi._
-import com.intellij.psi.codeStyle.{CodeStyleManager, JavaCodeStyleManager}
-import com.intellij.psi.util.ClassUtil
 
 /**
  * @author sigito
  */
-class SerializerGenerator(val clazz: PsiClass, val fields: Seq[SerializableField]) {
-  val SERIALIZER_CLASS_NAME: String = "com.tangosol.io.pof.PofSerializer"
-  val SERIALIZER_NAME_SUFFIX: String = "PofSerializer"
+class SerializerGenerator(entityClass: PsiClass, fields: IndexedSeq[PsiField], context: GenerationContext) {
+  @throws[ConstructorNotFoundException]
+  def generate(): PsiClass = {
+    val (constructor, parameterFields, restFields) = selectConstructor(getConstructors)
 
-  private val project: Project = clazz.getProject
-  private val manager: PsiManager = clazz.getManager
-  private val javaPsiFacade: JavaPsiFacade = JavaPsiFacade.getInstance(project)
-  private val elementFactory: PsiElementFactory = JavaPsiFacade.getElementFactory(project)
-
-  def generate(): Unit = {
-    // load serializer class
-    val serializer: PsiClass = createSerializer(clazz)
-    // add read/write indexes for fields
-    addIndexes(serializer)
-    // add write method
-    serializer.add(writeMethod())
-    // add read method
-    serializer.add(readMethod())
-
-    val serializerFile = createFile(serializer)
-
-    // process code formatting
-    JavaCodeStyleManager.getInstance(project).shortenClassReferences(serializerFile)
-    CodeStyleManager.getInstance(project).reformat(serializerFile)
-    serializerFile.navigate(true)
+    val entityFields = fields.zipWithIndex map {
+      case (field, index) => new EntityField(field, index, restFields.contains(field))
+    }
+    val serializer = new PofSerializer(context, new EntityClass(entityClass, constructor, parameterFields, restFields, entityFields))
+    // create file
+    serializer.createClass()
   }
 
-  private def createFile(serializer: PsiClass): PsiFile = {
-    val parent: PsiDirectory = clazz.getContainingFile.getParent
-    val containingFile = serializer.getContainingFile.setName(s"${serializer.getName}.java")
-    parent.add(containingFile).asInstanceOf[PsiFile]
+  private def getConstructors: Seq[PsiMethod] = {
+    // available non-private constructors, default(if exists) goes last
+    val constructors = entityClass.getConstructors.filterNot(
+      // exclude private constructors
+      _.getModifierList.hasModifierProperty(PsiModifier.PRIVATE)
+    ).sortBy(_.getParameterList.getParametersCount)(Ordering.Int.reverse)
+    constructors
   }
 
-  private def createSerializer(clazz: PsiClass): PsiClass = {
-    // load create new class for serializer
-    val serializerClass = elementFactory.createClass(clazz.getName + SERIALIZER_NAME_SUFFIX)
+  @throws[ConstructorNotFoundException]
+  private def selectConstructor(constructors: Seq[PsiMethod]): (PsiMethod, IndexedSeq[Int], IndexedSeq[Int]) = {
+    // set with constructor
+    var parameterFields = IndexedSeq[Int]()
+    // accessed in any other way
+    var otherFields: IndexedSeq[Int] = fields.indices
 
-    // implement PofSerializer
-    val implementsReferenceElement = elementFactory.createReferenceFromText(SERIALIZER_CLASS_NAME, serializerClass)
-    serializerClass.getImplementsList.add(implementsReferenceElement)
-    serializerClass.getModifierList.setModifierProperty(PsiModifier.PUBLIC, true)
-    serializerClass
-  }
+    val matchedConstructor = constructors.find {
+      constructor =>
+        parameterFields = IndexedSeq[Int]()
+        otherFields = fields.indices
 
-  private def addIndexes(serializer: PsiClass): Unit =
-    fields.foreach {
-      field =>
-      // create static field
-        val indexConstant = elementFactory.createField(field.indexName, PsiType.INT)
-        indexConstant.getModifierList.setModifierProperty(PsiModifier.PRIVATE, true)
-        indexConstant.getModifierList.setModifierProperty(PsiModifier.STATIC, true)
-        indexConstant.getModifierList.setModifierProperty(PsiModifier.FINAL, true)
-        indexConstant.setInitializer(elementFactory.createExpressionFromText(field.index.toString, serializer))
-        // add constant field to serializer class
-        serializer.add(indexConstant)
+        val parameters = constructor.getParameterList.getParameters
+        // check if every parameter has matching entity field
+        parameters.forall {
+          parameter =>
+            fields.zipWithIndex.find {
+              case (field, index) =>
+                parameter.getName == field.getName && parameter.getType.isAssignableFrom(field.getType)
+            } match {
+              case Some((field, index)) =>
+                // remember field
+                parameterFields :+ field
+                otherFields = otherFields.filterNot(_ == index)
+                true
+              case None => false
+            }
+        }
     }
 
-  private def writeMethod(): PsiMethod = {
-    val writerClass = ClassUtil.findPsiClassByJVMName(clazz.getManager, "com.tangosol.io.pof.PofWriter")
-    val code = new StringBuilder("public void serialize(com.tangosol.io.pof.PofWriter pofWriter, java.lang.Object o) throws java.io.IOException {")
-    // declare serialize object instance and cast
-    val instanceClassName: String = clazz.getQualifiedName
-    val instanceName = StringUtil.decapitalize(clazz.getName)
-    code ++= instanceClassName ++= " " ++= instanceName
-    // cast and assign input object to our class type
-    code.append(" = (") ++= instanceClassName ++= ") " ++= "o;"
-
-    // write every field
-    fields.foreach(PofSerializerUtils.addWriteMethod(code, writerClass, "pofWriter", instanceName, _))
-
-    // write remainder
-    code.append("pofWriter").append(".writeRemainder(null);")
-
-    code.append("}")
-    elementFactory.createMethodFromText(code.toString(), clazz)
-
+    matchedConstructor match {
+      case Some(constructor) => (constructor, parameterFields, otherFields)
+      case None => throw new ConstructorNotFoundException()
+    }
   }
 
-  private def readMethod(): PsiMethod = {
-    val readerClass = ClassUtil.findPsiClassByJVMName(clazz.getManager, "com.tangosol.io.pof.PofReader")
+  class ConstructorNotFoundException extends Exception
 
-    val instanceName = StringUtil.decapitalize(clazz.getName)
-    val instanceClassName: String = clazz.getQualifiedName
-
-    val code = new StringBuilder("public ") ++= instanceClassName ++= " deserialize(com.tangosol.io.pof.PofReader pofReader) throws java.io.IOException {"
-
-    // declare deserialize object instance and initialize
-    code ++= instanceClassName ++= " " ++= instanceName
-    code.append(" = new ") ++= instanceClassName ++= "();"
-
-    // read every field
-    fields.foreach(PofSerializerUtils.addReadMethod(code, readerClass, "pofReader", instanceName, _))
-
-    // read remainder
-    code.append("pofReader").append(".readRemainder();")
-
-    code.append("return ") ++= instanceName ++= ";"
-    code.append("}")
-    elementFactory.createMethodFromText(code.toString(), clazz)
-  }
 }
+

@@ -48,5 +48,5 @@ class GenerateDialog protected[pofgen](psiClass: PsiClass) extends DialogWrapper
    * Returns sequence of selected fields
    * @return
    */
-  def selectedFields: Seq[PsiField] = fieldsListModel.getItems
+  def selectedFields: IndexedSeq[PsiField] = fieldsListModel.getItems.toIndexedSeq
 }
