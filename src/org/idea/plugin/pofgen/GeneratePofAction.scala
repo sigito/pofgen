@@ -1,11 +1,12 @@
 package org.idea.plugin.pofgen
 
-import com.intellij.openapi.actionSystem.{LangDataKeys, PlatformDataKeys, AnActionEvent, AnAction}
+import com.intellij.openapi.actionSystem._
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.command.WriteCommandAction.Simple
 import com.intellij.psi._
 import com.intellij.psi.util.PsiTreeUtil
-import org.idea.plugin.pofgen.generation.{GenerationContext, Formatter, SerializerGenerator, EntityField}
+import org.idea.plugin.pofgen.generation.{GenerationContext, Formatter, SerializerGenerator}
+import scala.Some
 
 /**
  * @author sigito
@@ -28,8 +29,8 @@ class GeneratePofAction() extends AnAction() {
   }
 
   private def getPsiClassFromContext(e: AnActionEvent): Option[PsiClass] = {
-    val psiFile = Option(e.getData(LangDataKeys.PSI_FILE))
-    val editor = Option(e.getData(PlatformDataKeys.EDITOR))
+    val psiFile = Option(e.getData(CommonDataKeys.PSI_FILE))
+    val editor = Option(e.getData(CommonDataKeys.EDITOR))
 
     for {
       file <- psiFile
@@ -45,6 +46,7 @@ class GeneratePofAction() extends AnAction() {
         val context = GenerationContext(entityClazz)
 
         val serializerClazz: PsiClass = new SerializerGenerator(entityClazz, fields, context).generate()
+
         Formatter.format(serializerClazz, context)
 
         // create file

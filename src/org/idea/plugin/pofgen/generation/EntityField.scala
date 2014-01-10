@@ -1,10 +1,10 @@
 package org.idea.plugin.pofgen.generation
 
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.psi._
 import com.intellij.psi.codeStyle.{VariableKind, JavaCodeStyleManager}
 import com.intellij.psi.util.PropertyUtil
-import com.intellij.psi._
-import scala.Some
+import scala.util.control.NonFatal
 
 /**
  * @author sigito
@@ -23,7 +23,7 @@ class EntityField(val psiField: PsiField, val index: Int, val needSetter: Boolea
     if (needSetter) try {
       Option(PropertyUtil.findSetterForField(psiField))
     } catch {
-      case e: Exception =>
+      case NonFatal(e) =>
         log.warn(s"Setter for field $psiField not found.", e)
         None
     }

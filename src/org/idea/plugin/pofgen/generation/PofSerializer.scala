@@ -2,6 +2,8 @@ package org.idea.plugin.pofgen.generation
 
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi._
+import com.intellij.psi.util.{PsiFormatUtilBase, PsiFormatUtil}
+import com.intellij.psi.util.PsiFormatUtil.FormatClassOptions
 
 /**
  * @author sigito
@@ -14,25 +16,27 @@ class PofSerializer(context: GenerationContext,
 
   private var serializer: PsiClass = _
 
+  private val pofSerializerUtils = new PofSerializerUtils
+
   // serialize and deserialize methods
   private val (serialize: PsiMethod, deserialize: PsiMethod) = {
     val methods = serializerInterface.getMethods
     assert(methods.length == 2)
 
-    (if (methods(0).getName == "serialize") methods else methods.reverse) match {
-      case Array(serializeMethod, deserializeMethod) => (serializeMethod, deserializeMethod)
-    }
+    if (methods(0).getName == "serialize") (methods(0), methods(1))
+    else (methods(1), methods(0))
   }
 
   def createClass(): PsiClass = {
     if (serializer != null) return serializer
 
-    // load create new class for serializer
+    // create new class for serializer
     serializer = context.elementFactory.createClass(s"${entityClass.name}PofSerializer")
     serializer.getModifierList.setModifierProperty(PsiModifier.PUBLIC, true)
 
     // implement PofSerializer
-    serializer.getImplementsList.add(serializerInterface)
+    val serializerInterfaceRef = context.elementFactory.createClassReferenceElement(serializerInterface)
+    serializer.getImplementsList.add(serializerInterfaceRef)
 
     entityClass.fields foreach (f => addIndex(f.indexName, f.index))
     serializer.add(createSerializeMethod())
@@ -52,7 +56,7 @@ class PofSerializer(context: GenerationContext,
 
     // write every field
     entityClass.fields foreach {
-      code ++= PofSerializerUtils.writeMethodCall(writerClass, "pofWriter", instanceName, _) ++= ";"
+      code ++= pofSerializerUtils.writeMethodCall(writerClass, "pofWriter", instanceName, _) ++= ";"
     }
 
     // write remainder
@@ -72,7 +76,7 @@ class PofSerializer(context: GenerationContext,
 
     entityClass.fields.foreach {
       field =>
-        val (readMethod, returnType) = PofSerializerUtils.readMethodCall(readerClass, "pofReader", field)
+        val (readMethod, returnType) = pofSerializerUtils.readMethodCall(readerClass, "pofReader", field)
 
         code ++= field.typeName ++= " " ++= field.name ++= " = "
 
@@ -80,12 +84,12 @@ class PofSerializer(context: GenerationContext,
         // add cast
           code ++= "(" ++= field.typeName ++= ") "
 
-        code ++= readMethod
+        code ++= readMethod ++= ";"
     }
 
     // declare deserialize object instance and initialize
     code ++= instanceClassName ++= " " ++= instanceName ++= " = "
-    code ++= "new " ++ entityClass.constructor.getName ++= "("
+    code ++= "new " ++= entityClass.constructor.getName ++= "("
     entityClass.constructorFields.map(entityClass.fields(_).name).addString(code, ", ")
     code ++= ")"
     code ++= ";"
@@ -96,7 +100,7 @@ class PofSerializer(context: GenerationContext,
         val field = entityClass.fields(fieldIndex)
         field.setter match {
           case Some(setter) => code ++= instanceName ++= "." ++= setter.getName ++= "(" ++= field.name ++= ");"
-          case None => code ++= "// ERROR: no setter for field '" ++= field.name ++ "'"
+          case None => code ++= "// ERROR: no setter for field '" ++= field.name ++= "'\n"
         }
     }
 

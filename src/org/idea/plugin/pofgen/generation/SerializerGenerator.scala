@@ -6,12 +6,11 @@ import com.intellij.psi._
  * @author sigito
  */
 class SerializerGenerator(entityClass: PsiClass, fields: IndexedSeq[PsiField], context: GenerationContext) {
-  @throws[ConstructorNotFoundException]
   def generate(): PsiClass = {
     val (constructor, parameterFields, restFields) = selectConstructor(getConstructors)
 
     val entityFields = fields.zipWithIndex map {
-      case (field, index) => new EntityField(field, index, restFields.contains(field))
+      case (field, index) => new EntityField(field, index, restFields.contains(index))
     }
     val serializer = new PofSerializer(context, new EntityClass(entityClass, constructor, parameterFields, restFields, entityFields))
     // create file
@@ -27,7 +26,6 @@ class SerializerGenerator(entityClass: PsiClass, fields: IndexedSeq[PsiField], c
     constructors
   }
 
-  @throws[ConstructorNotFoundException]
   private def selectConstructor(constructors: Seq[PsiMethod]): (PsiMethod, IndexedSeq[Int], IndexedSeq[Int]) = {
     // set with constructor
     var parameterFields = IndexedSeq[Int]()
@@ -41,7 +39,7 @@ class SerializerGenerator(entityClass: PsiClass, fields: IndexedSeq[PsiField], c
 
         val parameters = constructor.getParameterList.getParameters
         // check if every parameter has matching entity field
-        parameters.forall {
+        parameters forall {
           parameter =>
             fields.zipWithIndex.find {
               case (field, index) =>
@@ -49,7 +47,7 @@ class SerializerGenerator(entityClass: PsiClass, fields: IndexedSeq[PsiField], c
             } match {
               case Some((field, index)) =>
                 // remember field
-                parameterFields :+ field
+                parameterFields :+= index
                 otherFields = otherFields.filterNot(_ == index)
                 true
               case None => false
@@ -59,11 +57,11 @@ class SerializerGenerator(entityClass: PsiClass, fields: IndexedSeq[PsiField], c
 
     matchedConstructor match {
       case Some(constructor) => (constructor, parameterFields, otherFields)
-      case None => throw new ConstructorNotFoundException()
+      case None =>
+        // todo create mock for default constructor and return
+        val defaultConstructor = null
+        (defaultConstructor, IndexedSeq.empty, fields.indices)
     }
   }
-
-  class ConstructorNotFoundException extends Exception
-
 }
 

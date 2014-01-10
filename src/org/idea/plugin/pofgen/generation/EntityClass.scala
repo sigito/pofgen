@@ -1,6 +1,6 @@
 package org.idea.plugin.pofgen.generation
 
-import com.intellij.psi.{PsiField, PsiMethod, PsiClass}
+import com.intellij.psi.{PsiMethod, PsiClass}
 
 /**
  * @author sigito
