@@ -2,11 +2,14 @@
   <id>org.idea.plugin.pofgen</id>
   <name>PofSerializer generator</name>
   <version>0.1</version>
-  <vendor email="yurii.samsoniuk@gmail.com" url="http://www.yourcompany.com">Yurii Samsoniuk</vendor>
+  <vendor email="yurii.samsoniuk [at] gmail.com" url="https://github.com/sigito/pofgen">Yurii Samsoniuk</vendor>
 
   <description><![CDATA[
-      Enter short description for your plugin here.<br>
-      <small>most HTML tags may be used</small>
+    Generates com.tangosol.io.pof.PofSerializer for entity class.<br>
+      Usage:
+      <ul>
+        <li>Generate menu -> Generate PofSerializer</li>
+      </ul>
       ]]></description>
 
   <change-notes><![CDATA[
