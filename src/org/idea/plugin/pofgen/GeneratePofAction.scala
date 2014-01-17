@@ -12,7 +12,7 @@ import scala.Some
  * @author sigito
  */
 class GeneratePofAction() extends AnAction() {
-  override def update(e: AnActionEvent) {
+  override def update(e: AnActionEvent): Unit = {
     val psiClass = getPsiClassFromContext(e)
     // todo check if coherence lib available
     e.getPresentation.setEnabled(psiClass.isDefined)
@@ -29,8 +29,8 @@ class GeneratePofAction() extends AnAction() {
   }
 
   private def getPsiClassFromContext(e: AnActionEvent): Option[PsiClass] = {
-    val psiFile = Option(e.getData(CommonDataKeys.PSI_FILE))
-    val editor = Option(e.getData(CommonDataKeys.EDITOR))
+    val psiFile = Option(e.getData(LangDataKeys.PSI_FILE))
+    val editor = Option(e.getData(PlatformDataKeys.EDITOR))
 
     for {
       file <- psiFile

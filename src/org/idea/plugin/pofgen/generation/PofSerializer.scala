@@ -14,8 +14,6 @@ class PofSerializer(context: GenerationContext,
 
   private val serializerInterface: PsiClass = context.findClass(SERIALIZER_CLASS_NAME)
 
-  private var serializer: PsiClass = _
-
   private val pofSerializerUtils = new PofSerializerUtils
 
   // serialize and deserialize methods
@@ -28,27 +26,26 @@ class PofSerializer(context: GenerationContext,
   }
 
   def createClass(): PsiClass = {
-    if (serializer != null) return serializer
-
     // create new class for serializer
-    serializer = context.elementFactory.createClass(s"${entityClass.name}PofSerializer")
+    implicit val serializer = context.elementFactory.createClass(s"${entityClass.name}PofSerializer")
     serializer.getModifierList.setModifierProperty(PsiModifier.PUBLIC, true)
 
     // implement PofSerializer
     val serializerInterfaceRef = context.elementFactory.createClassReferenceElement(serializerInterface)
     serializer.getImplementsList.add(serializerInterfaceRef)
 
-    entityClass.fields foreach (f => addIndex(f.indexName, f.index))
-    serializer.add(createSerializeMethod())
-    serializer.add(createDeserializeMethod())
+    // add constant field to serializer class
+    entityClass.fields foreach (f => serializer.add(createIndex(f.indexName, f.index)))
+    serializer.add(createSerializeMethod)
+    serializer.add(createDeserializeMethod)
     serializer
   }
 
-  private def createSerializeMethod(): PsiMethod = {
+  private def createSerializeMethod(implicit serializer: PsiClass): PsiMethod = {
     val writerClass = context.findClass("com.tangosol.io.pof.PofWriter")
     val code = new StringBuilder("public void serialize(com.tangosol.io.pof.PofWriter pofWriter, java.lang.Object o) throws java.io.IOException {")
     // declare serialize object instance and cast
-    val instanceClassName: String = entityClass.fullName
+    val instanceClassName = entityClass.fullName
     val instanceName = StringUtil.decapitalize(entityClass.name)
     code ++= instanceClassName ++= " " ++= instanceName
     // cast and assign input object to our class type
@@ -66,7 +63,7 @@ class PofSerializer(context: GenerationContext,
     context.elementFactory.createMethodFromText(code.toString(), serializer)
   }
 
-  private def createDeserializeMethod(): PsiMethod = {
+  private def createDeserializeMethod(implicit serializer: PsiClass): PsiMethod = {
     val readerClass = context.findClass("com.tangosol.io.pof.PofReader")
 
     val instanceClassName = entityClass.fullName
@@ -112,14 +109,13 @@ class PofSerializer(context: GenerationContext,
     context.elementFactory.createMethodFromText(code.toString(), serializer)
   }
 
-  private def addIndex(indexName: String, index: Int): Unit = {
+  private def createIndex(indexName: String, index: Int)(implicit serializer: PsiClass): PsiField = {
     // create static field
     val indexConstant = context.elementFactory.createField(indexName, PsiType.INT)
     indexConstant.getModifierList.setModifierProperty(PsiModifier.PRIVATE, true)
     indexConstant.getModifierList.setModifierProperty(PsiModifier.STATIC, true)
     indexConstant.getModifierList.setModifierProperty(PsiModifier.FINAL, true)
     indexConstant.setInitializer(context.elementFactory.createExpressionFromText(index.toString, serializer))
-    // add constant field to serializer class
-    serializer.add(indexConstant)
+    indexConstant
   }
 }
