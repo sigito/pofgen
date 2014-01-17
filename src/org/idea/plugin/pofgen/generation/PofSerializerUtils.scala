@@ -79,3 +79,7 @@ class PofSerializerUtils {
     }
   }
 }
+
+object PofSerializerUtils {
+  def apply(): PofSerializerUtils = new PofSerializerUtils
+}
