@@ -7,11 +7,14 @@ import com.intellij.psi._
 import com.intellij.psi.util.PsiTreeUtil
 import org.idea.plugin.pofgen.generation.{GenerationContext, Formatter, SerializerGenerator}
 import scala.Some
+import com.intellij.openapi.diagnostic.Logger
 
 /**
  * @author sigito
  */
 class GeneratePofAction() extends AnAction() {
+  private val log: Logger = Logger.getInstance(getClass)
+
   override def update(e: AnActionEvent): Unit = {
     val psiClass = getPsiClassFromContext(e)
     // todo check if coherence lib available
@@ -41,17 +44,21 @@ class GeneratePofAction() extends AnAction() {
   }
 
   private def executeGenerationAction(entityClazz: PsiClass, fields: IndexedSeq[PsiField]): Unit = {
+    log info s"Generating for $entityClazz, fields: $fields"
     val action: WriteCommandAction[_] = new Simple(entityClazz.getProject, entityClazz.getContainingFile) {
       override def run(): Unit = {
         val context = GenerationContext(entityClazz)
 
         val serializerClazz: PsiClass = new SerializerGenerator(entityClazz, fields, context).generate()
-
-        Formatter.format(serializerClazz, context)
+        log info s"Generated serializer class ${serializerClazz.getName}"
 
         // create file
         val parent: PsiDirectory = entityClazz.getContainingFile.getParent
         val serializerFile = createClassFile(parent, serializerClazz)
+        log info s"Serializer ${serializerClazz.getName} for ${entityClazz.getName} created at ${serializerFile.getName} "
+
+        Formatter.format(serializerFile, context)
+        log info "Resulting class formatted."
 
         serializerFile.navigate(true)
       }
@@ -61,7 +68,9 @@ class GeneratePofAction() extends AnAction() {
   }
 
   private def createClassFile(dir: PsiDirectory, clazz: PsiClass): PsiFile = {
-    val containingFile = clazz.getContainingFile.setName(s"${clazz.getName}.java")
+    val serializerFileName = s"${clazz.getName}.java"
+    log debug s"Adding serializer class file to project: $serializerFileName"
+    val containingFile = clazz.getContainingFile.setName(serializerFileName)
     dir.add(containingFile).asInstanceOf[PsiFile]
   }
 }
