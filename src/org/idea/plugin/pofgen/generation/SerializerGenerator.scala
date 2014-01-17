@@ -58,8 +58,8 @@ class SerializerGenerator(entityClass: PsiClass, fields: IndexedSeq[PsiField], c
     matchedConstructor match {
       case Some(constructor) => (constructor, parameterFields, otherFields)
       case None =>
-        // todo create mock for default constructor and return
-        val defaultConstructor = null
+        // create mock default constructor and return
+        val defaultConstructor = context.elementFactory.createConstructor(entityClass.getName, entityClass)
         (defaultConstructor, IndexedSeq.empty, fields.indices)
     }
   }
