@@ -6,7 +6,6 @@ import com.intellij.psi.{PsiModifier, PsiField, PsiClass}
 import com.intellij.ui.components.JBList
 import com.intellij.ui.{CollectionListModel, ToolbarDecorator}
 import javax.swing.{ListCellRenderer, JList, JComponent, JPanel}
-import org.jetbrains.annotations.Nullable
 import scala.collection.convert.WrapAsScala._
 
 /**
@@ -41,7 +40,6 @@ class GenerateDialog protected[pofgen](psiClass: PsiClass) extends DialogWrapper
 
   init()
 
-  @Nullable
   override def createCenterPanel(): JComponent = component
 
   /**

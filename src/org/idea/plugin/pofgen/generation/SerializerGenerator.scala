@@ -28,13 +28,13 @@ class SerializerGenerator(entityClass: PsiClass, fields: IndexedSeq[PsiField], c
 
   private def selectConstructor(constructors: Seq[PsiMethod]): (PsiMethod, IndexedSeq[Int], IndexedSeq[Int]) = {
     // set with constructor
-    var parameterFields = IndexedSeq[Int]()
+    var parameterFields = IndexedSeq.empty[Int]
     // accessed in any other way
     var otherFields: IndexedSeq[Int] = fields.indices
 
     val matchedConstructor = constructors.find {
       constructor =>
-        parameterFields = IndexedSeq[Int]()
+        parameterFields = IndexedSeq.empty[Int]
         otherFields = fields.indices
 
         val parameters = constructor.getParameterList.getParameters

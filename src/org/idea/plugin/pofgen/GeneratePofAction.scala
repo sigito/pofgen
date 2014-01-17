@@ -12,7 +12,7 @@ import scala.Some
  * @author sigito
  */
 class GeneratePofAction() extends AnAction() {
-  override def update(e: AnActionEvent) {
+  override def update(e: AnActionEvent): Unit = {
     val psiClass = getPsiClassFromContext(e)
     // todo check if coherence lib available
     e.getPresentation.setEnabled(psiClass.isDefined)

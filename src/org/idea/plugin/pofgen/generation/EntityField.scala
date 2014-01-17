@@ -3,7 +3,7 @@ package org.idea.plugin.pofgen.generation
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.psi._
 import com.intellij.psi.codeStyle.{VariableKind, JavaCodeStyleManager}
-import com.intellij.psi.util.PropertyUtil
+import org.idea.plugin.pofgen.util.PsiFieldAsBean
 import scala.util.control.NonFatal
 
 /**
@@ -16,12 +16,12 @@ class EntityField(val psiField: PsiField, val index: Int, val needSetter: Boolea
 
   val name: String = psiField.getName
 
-  val getter: PsiMethod = PropertyUtil.findGetterForField(psiField)
+  val getter: PsiMethod = psiField.getter
 
   // can be empty if final field and set
   val setter: Option[PsiMethod] =
     if (needSetter) try {
-      Option(PropertyUtil.findSetterForField(psiField))
+      Option(psiField.setter)
     } catch {
       case NonFatal(e) =>
         log.warn(s"Setter for field $psiField not found.", e)
