@@ -1,20 +1,24 @@
 package org.idea.plugin.pofgen.generation
 
+import com.intellij.codeInsight.generation.OverrideImplementUtil
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi._
-import com.intellij.psi.util.{PsiFormatUtilBase, PsiFormatUtil}
-import com.intellij.psi.util.PsiFormatUtil.FormatClassOptions
+import com.intellij.psi.util.PsiTypesUtil
+import scala.collection.convert.WrapAsScala._
+
 
 /**
  * @author sigito
  */
 class PofSerializer(context: GenerationContext,
                     entityClass: EntityClass) {
+  import context._
+
   private val SERIALIZER_CLASS_NAME: String = "com.tangosol.io.pof.PofSerializer"
 
-  private val serializerInterface: PsiClass = context.findClass(SERIALIZER_CLASS_NAME)
+  private val serializerInterface: PsiClass = findClass(SERIALIZER_CLASS_NAME)
 
-  private val pofSerializerUtils = new PofSerializerUtils
+  private val pofSerializerUtils = PofSerializerUtils()
 
   // serialize and deserialize methods
   private val (serialize: PsiMethod, deserialize: PsiMethod) = {
@@ -27,11 +31,11 @@ class PofSerializer(context: GenerationContext,
 
   def createClass(): PsiClass = {
     // create new class for serializer
-    implicit val serializer = context.elementFactory.createClass(s"${entityClass.name}PofSerializer")
+    implicit val serializer = elementFactory.createClass(s"${entityClass.name}PofSerializer")
     serializer.getModifierList.setModifierProperty(PsiModifier.PUBLIC, true)
 
     // implement PofSerializer
-    val serializerInterfaceRef = context.elementFactory.createClassReferenceElement(serializerInterface)
+    val serializerInterfaceRef = elementFactory.createClassReferenceElement(serializerInterface)
     serializer.getImplementsList.add(serializerInterfaceRef)
 
     // add constant field to serializer class
@@ -42,29 +46,34 @@ class PofSerializer(context: GenerationContext,
   }
 
   private def createSerializeMethod(implicit serializer: PsiClass): PsiMethod = {
-    val writerClass = context.findClass("com.tangosol.io.pof.PofWriter")
-    val code = new StringBuilder("public void serialize(com.tangosol.io.pof.PofWriter pofWriter, java.lang.Object o) throws java.io.IOException {")
+    // implement method
+    val serializeMethod = OverrideImplementUtil.overrideOrImplementMethod(serializer, serialize, false).head
+    val body = serializeMethod.getBody
+
+    val writerClass = findClass("com.tangosol.io.pof.PofWriter")
+
     // declare serialize object instance and cast
     val instanceClassName = entityClass.fullName
     val instanceName = StringUtil.decapitalize(entityClass.name)
-    code ++= instanceClassName ++= " " ++= instanceName
-    // cast and assign input object to our class type
-    code ++= " = (" ++= instanceClassName ++= ") " ++= "o;"
+    val castInit = elementFactory.createExpressionFromText(s"($instanceClassName) o", body)
+    val instanceVar = elementFactory.createVariableDeclarationStatement(instanceName, PsiTypesUtil.getClassType(entityClass.clazz), castInit)
+    body add instanceVar
 
     // write every field
-    entityClass.fields foreach {
-      code ++= pofSerializerUtils.writeMethodCall(writerClass, "pofWriter", instanceName, _) ++= ";"
-    }
+    for {
+      field <- entityClass.fields
+      methodCall = pofSerializerUtils.writeMethodCall(writerClass, "pofWriter", instanceName, field)
+      statement = elementFactory.createStatementFromText(methodCall + ';', body)
+    } body add statement
 
     // write remainder
-    code ++= "pofWriter.writeRemainder(null);"
+    body add elementFactory.createStatementFromText("pofWriter.writeRemainder(null);", body)
 
-    code ++= "}"
-    context.elementFactory.createMethodFromText(code.toString(), serializer)
+    serializeMethod
   }
 
   private def createDeserializeMethod(implicit serializer: PsiClass): PsiMethod = {
-    val readerClass = context.findClass("com.tangosol.io.pof.PofReader")
+    val readerClass = findClass("com.tangosol.io.pof.PofReader")
 
     val instanceClassName = entityClass.fullName
     val instanceName = StringUtil.decapitalize(entityClass.name)
@@ -106,16 +115,16 @@ class PofSerializer(context: GenerationContext,
 
     code ++= "return " ++= instanceName ++= ";"
     code ++= "}"
-    context.elementFactory.createMethodFromText(code.toString(), serializer)
+    elementFactory.createMethodFromText(code.toString(), serializer)
   }
 
   private def createIndex(indexName: String, index: Int)(implicit serializer: PsiClass): PsiField = {
     // create static field
-    val indexConstant = context.elementFactory.createField(indexName, PsiType.INT)
+    val indexConstant = elementFactory.createField(indexName, PsiType.INT)
     indexConstant.getModifierList.setModifierProperty(PsiModifier.PRIVATE, true)
     indexConstant.getModifierList.setModifierProperty(PsiModifier.STATIC, true)
     indexConstant.getModifierList.setModifierProperty(PsiModifier.FINAL, true)
-    indexConstant.setInitializer(context.elementFactory.createExpressionFromText(index.toString, serializer))
+    indexConstant.setInitializer(elementFactory.createExpressionFromText(index.toString, serializer))
     indexConstant
   }
 }
