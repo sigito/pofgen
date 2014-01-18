@@ -49,6 +49,8 @@ class PofSerializer(context: GenerationContext,
     // implement method
     val serializeMethod = OverrideImplementUtil.overrideOrImplementMethod(serializer, serialize, false).head
     val body = serializeMethod.getBody
+    // cleanup body, can contain template lines
+    body.deleteChildRange(body.getFirstBodyElement, body.getLastBodyElement)
 
     val writerClass = findClass("com.tangosol.io.pof.PofWriter")
 

@@ -6,7 +6,6 @@ import com.intellij.openapi.command.WriteCommandAction.Simple
 import com.intellij.psi._
 import com.intellij.psi.util.PsiTreeUtil
 import org.idea.plugin.pofgen.generation.{GenerationContext, Formatter, SerializerGenerator}
-import scala.Some
 import com.intellij.openapi.diagnostic.Logger
 
 /**
