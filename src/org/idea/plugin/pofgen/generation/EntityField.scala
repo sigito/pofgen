@@ -12,7 +12,7 @@ import scala.util.control.NonFatal
 class EntityField(val psiField: PsiField, val index: Int, val needSetter: Boolean = true) {
   private val log: Logger = Logger.getInstance(getClass)
 
-  val typeName = psiField.getType.getCanonicalText
+  val typeName: String = psiField.getType.getCanonicalText
 
   val name: String = psiField.getName
 

@@ -5,6 +5,7 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.psi._
 import com.intellij.psi.util.PsiTypesUtil
 import scala.collection.convert.WrapAsScala._
+import com.intellij.psi.impl.source.tree.PsiWhiteSpaceImpl
 
 
 /**
@@ -47,8 +48,8 @@ class PofSerializer(context: GenerationContext,
 
   private def createSerializeMethod(implicit serializer: PsiClass): PsiMethod = {
     // implement method
-    val serializeMethod = OverrideImplementUtil.overrideOrImplementMethod(serializer, serialize, false).head
-    val body = serializeMethod.getBody
+    val method = OverrideImplementUtil.overrideOrImplementMethod(serializer, serialize, false).head
+    val body = method.getBody
     // cleanup body, can contain template lines
     body.deleteChildRange(body.getFirstBodyElement, body.getLastBodyElement)
 
@@ -71,53 +72,57 @@ class PofSerializer(context: GenerationContext,
     // write remainder
     body add elementFactory.createStatementFromText("pofWriter.writeRemainder(null);", body)
 
-    serializeMethod
+    method
   }
 
   private def createDeserializeMethod(implicit serializer: PsiClass): PsiMethod = {
+    val method = OverrideImplementUtil.overrideOrImplementMethod(serializer, deserialize, false).head
+    val body = method.getBody
+    // cleanup body, can contain template lines
+    body.deleteChildRange(body.getFirstBodyElement, body.getLastBodyElement)
+
     val readerClass = findClass("com.tangosol.io.pof.PofReader")
 
-    val instanceClassName = entityClass.fullName
     val instanceName = StringUtil.decapitalize(entityClass.name)
-
-    val code = new StringBuilder("public ") ++= instanceClassName ++= " deserialize(com.tangosol.io.pof.PofReader pofReader) throws java.io.IOException {"
 
     entityClass.fields.foreach {
       field =>
+        def cast(returnType: PsiType): String =
+          if (field.psiField.getType.isAssignableFrom(returnType)) ""
+          else s"(${field.typeName})"
+
         val (readMethod, returnType) = pofSerializerUtils.readMethodCall(readerClass, "pofReader", field)
-
-        code ++= field.typeName ++= " " ++= field.name ++= " = "
-
-        if (!field.psiField.getType.isAssignableFrom(returnType))
-        // add cast
-          code ++= "(" ++= field.typeName ++= ") "
-
-        code ++= readMethod ++= ";"
+        val readWithCast = elementFactory.createExpressionFromText(s"${cast(returnType)}$readMethod", body)
+        val readStatement = elementFactory.createVariableDeclarationStatement(field.name, field.psiField.getType, readWithCast)
+        body add readStatement
     }
 
     // declare deserialize object instance and initialize
-    code ++= instanceClassName ++= " " ++= instanceName ++= " = "
-    code ++= "new " ++= entityClass.constructor.getName ++= "("
-    entityClass.constructorFields.map(entityClass.fields(_).name).addString(code, ", ")
-    code ++= ")"
-    code ++= ";"
+    val newInstance = elementFactory.createExpressionFromText(constructorCall, body)
+    val instance = elementFactory.createVariableDeclarationStatement(instanceName, PsiTypesUtil.getClassType(entityClass.clazz), newInstance)
+    body add instance
 
     // set other fields with setters
-    entityClass.restFields.foreach {
-      fieldIndex =>
-        val field = entityClass.fields(fieldIndex)
+    entityClass.restFields.map(entityClass.fields(_)).foreach {
+      field =>
         field.setter match {
-          case Some(setter) => code ++= instanceName ++= "." ++= setter.getName ++= "(" ++= field.name ++= ");"
-          case None => code ++= "// ERROR: no setter for field '" ++= field.name ++= "'\n"
+          case Some(setter) =>
+            val setterCall = elementFactory.createStatementFromText(s"$instanceName.${setter.getName}(${field.name});", body)
+            body add setterCall
+          case None =>
+            // no setter, writer error message
+            // add comment on new line
+            body add PsiParserFacade.SERVICE.getInstance(project).createWhiteSpaceFromText("\n") // I wonder if there is some other way to insert new line
+            body add elementFactory.createCommentFromText(s"// ERROR: no setter for field '${field.name}'.", body)
         }
     }
 
     // read remainder
-    code ++= "pofReader.readRemainder();"
+    body add elementFactory.createStatementFromText("pofReader.readRemainder();", body)
+    // return value
+    body add elementFactory.createStatementFromText(s"return $instanceName;", body)
 
-    code ++= "return " ++= instanceName ++= ";"
-    code ++= "}"
-    elementFactory.createMethodFromText(code.toString(), serializer)
+    method
   }
 
   private def createIndex(indexName: String, index: Int)(implicit serializer: PsiClass): PsiField = {
@@ -128,5 +133,13 @@ class PofSerializer(context: GenerationContext,
     indexConstant.getModifierList.setModifierProperty(PsiModifier.FINAL, true)
     indexConstant.setInitializer(elementFactory.createExpressionFromText(index.toString, serializer))
     indexConstant
+  }
+
+  private def constructorCall: String = {
+    val code = StringBuilder.newBuilder
+    code ++= "new " ++= entityClass.constructor.getName ++= "("
+    entityClass.constructorFields.map(entityClass.fields(_).name).addString(code, ", ")
+    code ++= ")"
+    code.toString()
   }
 }
